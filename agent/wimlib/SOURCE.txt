@@ -1,0 +1,4 @@
+wimlib 1.14.4 for Windows x86-64, unmodified, from https://wimlib.net/downloads/wimlib-1.14.4-windows-x86_64-bin.zip
+SHA-256 of that zip: 6D99E242BFBC6D36FC987D433D63772180551B7F2D8DE43E9561535A3E2C16D8
+Source code: https://wimlib.net/downloads/wimlib-1.14.4.tar.gz (GPLv3 / LGPLv3, see COPYING.txt).
+The Mtaalam V2V Agent runs wimlib-imagex.exe to copy resized volumes file by file.

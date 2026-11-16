@@ -1,0 +1,184 @@
+GEUZAVIRT 1.4.14  -  machines to Proxmox VE and VMware ESXi
+Core Mtaalam Technologies  |  mtaalamtech.com  |  info@mtaalamtech.com
+==========================================================================================
+
+WHAT IT CONVERTS
+  Sources                                         Destinations
+    This PC (Windows, running)                      Proxmox VE virtual machine
+    Remote Windows machine (running)                Proxmox VE template
+    Remote Linux machine (running)                  VMware ESXi virtual machine
+    VMware ESXi virtual machine                     VMware template (OVF package)
+    Proxmox VE virtual machine
+    VMware Workstation / .vmx files
+  Linux machines and .vmx files go to Proxmox VE only.
+
+Requirements
+  - Windows 10 or 11 with the OpenSSH Client
+    (Settings > System > Optional features > OpenSSH Client; installed by default on most PCs)
+  - Proxmox VE 7.2 or newer, reachable over SSH as root
+  - ESXi: the ESXi host itself (not vCenter), port 443 from this PC and from the Proxmox host
+  - Linux sources: SSH login as root or as a user allowed to use sudo; rsync on the machine;
+    the Proxmox host must reach the machine's SSH port and root must be allowed to log in
+    with a key (PermitRootLogin prohibit-password or yes)
+  - Proxmox VE sources: SSH login as root
+
+MAIN WINDOW
+  Conversion tasks   every machine you converted in this session: source, destination,
+                     progress and status. Double-click (or "Convert machine...") for a new one -
+                     also while other conversions run: they run side by side. The progress
+                     card shows the selected task; Cancel asks which conversion to stop.
+                     Dropping VMware .vmx files or VM folders on the list opens the wizard
+                     with them.
+  Progress           the current machine and the whole run, plus
+                       Network speed            average over the last 15 seconds
+                       Transferred              data moved in this run
+                       Elapsed                  for the run (and the current machine)
+                       Time left                for this machine and for all of them, from
+                                                how fast the progress grew in the last minutes
+  Activity log       every step, and how long each conversion took. Send the log to support if a
+                     conversion fails.
+  Log files          %LOCALAPPDATA%\MtaalamV2V\logs ("Open logs" points at the selected task's file).
+                     One file per conversion, named after the machine, the start and the result:
+                       web01.example.com - 2026-11-09 09.57 - OK.log
+                     The result is OK, FAILED, CANCELLED, INTERRUPTED or, for several machines,
+                     e.g. "2 of 3 OK"; a run with no result yet is still going or the program
+                     stopped. Several machines at once: "first-name +2 more". Sort by name to see
+                     every attempt for a machine, by date for the newest. Anything else (connecting,
+                     Finalize) goes to the "Other activity" folder, one file per day.
+  Clicking a task    shows that task (running or finished) in Progress and only its lines in the
+                     Activity log, with its result, time and data moved. Click an empty part of
+                     the list to see everything again.
+  Buttons            Convert machine..., Cancel, Retry, Guest prep scripts (help and the scripts),
+                     Open logs, Clear finished; Finalize Windows VM appears only when a converted
+                     Windows VM still needs it
+  Retry              converts the selected failed, cancelled or interrupted tasks again with the
+                     same settings (all of them if none is selected). A Proxmox VM the failed
+                     attempt created is removed first (only if it still has the same name);
+                     running machines are copied from new snapshots.
+
+CONVERT MACHINE WIZARD - laid out like VMware vCenter Converter Standalone
+   The steps are listed on the left; "Source:" and "Destination:" at the top show what you
+   picked. Click an earlier step to go back.
+     Source System
+         Powered on  > This local machine       the PC running the converter
+                     > Remote Windows machine   IP address or name + administrator user name and
+                                                password. The converter deploys the GeuzaVirt
+                                                agent there by itself (or updates it); an
+                                                installed agent's pairing key also works.
+                     > Remote Linux machine     IP address or name, SSH port, user name and
+                                                password (empty = your SSH key). Nothing is
+                                                installed.
+         Powered off > VMware ESXi virtual machine   connect to the host, tick the VMs
+                     > Proxmox VE virtual machine    connect to the host, tick the VMs
+                     > VMware Workstation (.vmx)     add the .vmx files
+         "View source details..." (running machines) shows type, firmware, OS, CPUs, RAM,
+         network settings and the disk/volume layout.
+     Destination System   Proxmox VE VM or template, VMware ESXi VM, or OVF package; then the
+                          server details (Proxmox over SSH, the ESXi host, or the OVF folder).
+     Destination Virtual Machine   name (and VM ID on Proxmox); existing VMs are listed.
+     Destination Location   Proxmox: storage, thin/thick, temp folder.  ESXi: datastore,
+                            virtual machine version, disk format, staging folder on this PC.
+     Options   Data to copy, Devices (vCPUs, memory, CPU type), Networks, Advanced options
+     Summary   check everything, then Finish. The run shows in the main window.
+
+HOW EACH SOURCE IS COPIED
+  Running Windows machine (this PC or remote)
+     The agent takes a VSS snapshot of every disk; the machine keeps running. Only used blocks
+     are copied (page file and hibernation file skipped), encrypted. The Proxmox host downloads
+     the disks straight from the agent (TCP 8786). Before the snapshot the agent enables the
+     boot drivers for the new hardware so Windows does not stop with error 7B. If Windows cannot
+     take a snapshot of a small partition without a drive letter (System Reserved, up to 2 GB),
+     that partition is copied directly from the disk and the log says so.
+     Data to copy (to Proxmox): every NTFS volume can be resized - Maintain size / Min size
+     (used + 3% + 0.5 GB) / Recommended (used + 25% + 2 GB) / a size in GB. Like VMware
+     Converter, a resized volume is copied file by file:
+       1. The Proxmox host reads the partition table and creates ONE disk per source disk at
+          the size of the new layout (e.g. 250 GB -> 80.5 GB) - never at the old size.
+       2. The partitions that keep their size (EFI, recovery, System Reserved) are copied block
+          by block to their new place; the partition table is rewritten for the new sizes.
+       3. Each resized volume is created new at its size (mkntfs, same cluster size, label,
+          serial number and boot code) and the agent sends its files from the VSS snapshot
+          (wimlib: permissions, short names, hard links, reparse points, alternate streams;
+          compressed and encrypted). The partitions fill the new disk exactly.
+          If the Proxmox host has enough free memory (volume size + 16 GB) the volume is built
+          in memory and then written to the disk in one pass, which is far faster on hard disks.
+     The source machine is not changed. On MBR disks only the last volume can change size.
+     The Proxmox host needs the packages wimtools and ntfs-3g (installed automatically).
+     The agent copies wimlib (free software, GPLv3/LGPLv3, wimlib.net) into
+     C:\Windows\MtaalamV2V\wimlib. EFS-encrypted files cannot be copied file by file.
+     Machines with a WSL 1 Linux distribution: a resized volume is copied without its special
+     files (devices, pipes, sockets) and its Linux files lose their owners and permissions, so
+     the distribution may not work in the new VM; the log says so. To keep it intact, choose
+     Maintain size.
+     Agents older than 1.4 copy block by block and shrink with ntfsresize afterwards; if
+     that fails, Windows shrinks the volumes at the first start and "Finalize Windows VM"
+     cuts the disk.
+     VirtIO: if virtio-win-guest-tools is installed on the machine, the copy starts on VirtIO
+     SCSI/network right away. Otherwise it starts on SATA with an extra empty 1 GB disk (scsi30)
+     that only lets Windows install the VirtIO driver; "Finalize Windows VM" removes it.
+
+  Running Linux machine
+     Like VMware Converter's Linux live copy, file by file:
+       1. The converter reads the disks, partitions, LVM and file systems over SSH.
+       2. A temporary SSH key for root is added on the machine (removed afterwards).
+       3. The Proxmox host creates the VM disks with the same partition tables, LVM volume
+          groups and file systems - same UUIDs and labels, so fstab and the boot loader keep
+          working - and copies the files with rsync (ACLs, extended attributes, hard links).
+          The EFI and BIOS boot partitions are copied as they are.
+       4. It adds the VirtIO drivers to the initramfs, keeps the names of the en* network cards
+          (pinned to the MAC addresses of the new VM, so the IP settings stay valid), installs
+          the EFI fallback boot loader if needed and makes SELinux relabel at the first boot.
+     Supported: x86-64, ext2/3/4, XFS, swap, vfat, plain LVM. Not supported: btrfs, ZFS, LUKS,
+     software RAID. The storage must be LVM-thin, LVM, ZFS or a directory storage.
+     Data to copy: ext2/3/4 and XFS partitions, swap partitions and LVM physical volumes (VG on
+     one disk) can get a new size. The Proxmox disk is created at the size of the new layout,
+     the partitions move up behind a changed one, and the file systems are created at their new
+     size before the files are copied. A smaller LVM physical volume shrinks its file system
+     LVs (each keeps at least its used space + 3% + 256 MB). Disks with logical (extended)
+     partitions keep their sizes. Files changed during the copy may be missed: stop busy databases
+     first, or tick "Power off the source machine after the conversion" for a final move.
+     If the machine's IP settings name the old card (e.g. eth0 with net.ifnames=0) they are
+     left as they are.
+
+  VMware ESXi virtual machine
+     Proxmox copies the disks straight from the ESXi host; the data does not pass this PC.
+     Proxmox 8.2+ uses its built-in ESXi importer; older versions stream each disk. VMs with
+     snapshots are first copied whole into the temp folder - consolidate snapshots first.
+     ESXi locks the disks of a running VM, so running VMs are shut down cleanly through VMware
+     Tools (or the agent) before copying, and stay off on ESXi.
+
+  Proxmox VE virtual machine
+     To Proxmox VE: the destination host pulls a vzdump backup stream from the source host
+       (snapshot mode - the VM may keep running) and restores it with qmrestore. The source
+       host only lets the temporary key run that one vzdump command. The copy keeps its Proxmox
+       settings; name, vCPUs, memory and bridge are set from the wizard, ISOs that do not exist
+       on the new host and PCI/USB passthrough are removed. The source may be the same host.
+     To VMware: the VM is shut down, the source host writes each disk as a compressed VMDK
+       (qemu-img) into its largest directory storage, this PC downloads it into the staging
+       folder and builds the OVF. Windows VMs boot on VMware only if their LSI Logic SAS driver
+       is enabled; otherwise use "Remote Windows machine", which prepares it.
+
+  VMware Workstation / .vmx files
+     The files are uploaded from this PC to the temp folder on the Proxmox host (interrupted
+     uploads continue where they stopped).
+
+WINDOWS VMs COPIED FROM FILES OR A POWERED-OFF ESXi VM
+   - Prepare them first (Guest prep scripts): windows-prep.ps1 -VirtioInstaller
+     E:\virtio-win-guest-tools.exe -RemoveVmwareTools (E: = the mounted virtio-win.iso from
+     https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso),
+     and tick "Windows already has VirtIO drivers" in the wizard. Note the BitLocker recovery key.
+   - Otherwise the VM first boots on SATA disks. Inside Windows run virtio-win-guest-tools.exe,
+     shut down, select the VM in the task list and click "Finalize Windows VM".
+   - Then boot it and run guest-prep\windows-post.ps1 as Administrator (static IPs, BitLocker).
+   Live copies of running Windows machines do not need any of this.
+
+LIVE COPY NOTES
+   - Changes made after the snapshot / during the copy are not in the copy. For a final move
+     tick "Power off the source machine after the conversion"; otherwise start only one of the
+     two on the network - both have the same name and IP address. With an ESXi import the
+     source is powered off only after the VM exists on ESXi, and the copy is started only
+     once the source no longer answers on the network.
+   - Templates: the source keeps running and its IP settings are not put on the copy.
+
+Options
+   CPU type   "host" is fastest. In a Proxmox cluster with different CPU models use x86-64-v2-AES.

@@ -1,0 +1,12 @@
+# build output
+dist/
+app/obj/
+*.exe
+!agent/wimlib/wimlib-imagex.exe
+*.zip
+agent/MtaalamV2VAgent.exe.config
+
+# local notes, recordings, logs
+*.log
+*.mp4
+PROJECT-STATUS.md
