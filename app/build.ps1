@@ -46,6 +46,7 @@ Copy-Item -Recurse -Force (Join-Path $repo 'agent') $out
 Remove-Item -Recurse -Force (Join-Path $out 'agent\src')
 Copy-Item -Force (Join-Path $repo 'vmware2pve.sh') $out
 Copy-Item -Force (Join-Path $here 'USER-GUIDE.txt') $out
+Copy-Item -Force (Join-Path $repo 'LICENSE') (Join-Path $out 'LICENSE.txt')   # GPLv3; source: github.com/mtaalamtech/geuzavirt
 
 $version = (Select-String -Path "$here\src\Program.cs" -Pattern 'Version = "([0-9.]+)"').Matches[0].Groups[1].Value
 if ($OutName -ne 'GeuzaVirt') { Write-Host "Built $exe"; return }
