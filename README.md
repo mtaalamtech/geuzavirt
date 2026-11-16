@@ -1,6 +1,10 @@
+<img src="docs/images/logo.png" alt="GeuzaVirt logo" width="96" align="right">
+
 # GeuzaVirt
 
 **Move running Windows and Linux machines, VMware VMs and Proxmox VMs to Proxmox VE or VMware ESXi, with a few clicks and no downtime while the copy runs.**
+
+![Sources, GeuzaVirt and destinations](docs/images/how-it-works.png)
 
 *Geuza* is Swahili for "turn" or "convert". GeuzaVirt is a Windows desktop app by
 [Core Mtaalam Technologies](https://mtaalamtech.com). It works like VMware vCenter Converter
@@ -20,6 +24,8 @@ Standalone, but it also targets Proxmox VE.
 | VMware ESXi virtual machine              | ✓ | ✓ |
 | Proxmox VE virtual machine               | ✓ | ✓ |
 | VMware Workstation `.vmx` files          | ✓ | – |
+
+![The GeuzaVirt main window](docs/images/main-window.png)
 
 ## Highlights
 
